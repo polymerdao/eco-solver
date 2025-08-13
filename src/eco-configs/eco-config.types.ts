@@ -531,6 +531,6 @@ export interface PolymerConfig {
   enabled: boolean
   apiUrl: string
   apiToken: string
-  proverAddresses: Record<number, Hex>
-  supportedChains: number[]
+  defaultProverAddress: Hex
+  chainOverrides?: Record<number, Hex>
 }

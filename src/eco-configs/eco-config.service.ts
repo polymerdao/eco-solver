@@ -384,4 +384,23 @@ export class EcoConfigService {
   getPolymerConfig(): EcoConfigType['polymer'] {
     return this.get('polymer')
   }
+
+  getPolymerProverAddress(chainID: number): Hex | undefined {
+    const polymerConfig = this.getPolymerConfig()
+    if (!polymerConfig) return undefined
+
+    // Check for chain-specific override first
+    const override = polymerConfig.chainOverrides?.[chainID]
+    if (override) {
+      return override
+    }
+
+    // Fall back to default prover address
+    return polymerConfig.defaultProverAddress
+  }
+
+  isPolymerProverAddress(address: Hex, chainID: number): boolean {
+    const proverAddress = this.getPolymerProverAddress(chainID)
+    return proverAddress?.toLowerCase() === address.toLowerCase()
+  }
 }

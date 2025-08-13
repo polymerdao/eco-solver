@@ -260,10 +260,8 @@ export class WalletFulfillService implements IFulfillService {
     const claimant = this.ecoConfigService.getEth().claimant
 
     // Polymer Prover - NEW
-    const isPolymer = this.proofService.isPolymerProver(
-      Number(model.intent.route.source),
-      model.intent.reward.prover,
-    )
+    const sourceChainId = Number(model.intent.route.source)
+    const isPolymer = this.ecoConfigService.isPolymerProverAddress(model.intent.reward.prover, sourceChainId)
     if (isPolymer) {
       const result = await this.getFulfillTxForPolymerprover(inboxAddress, claimant, model)
       this.ecoAnalytics.trackFulfillIntentTxCreationSuccess(
@@ -490,28 +488,36 @@ export class WalletFulfillService implements IFulfillService {
 
   /**
    * Generates a transaction to fulfill an intent for a Polymer prover
-   * For Polymer, we just call fulfill() without immediate proving
-   * The proof will be submitted separately via the Polymer API
+   * For Polymer, we call fulfillAndProve() to trigger the PolyNativeProver.prove() function
+   * which emits the IntentFulfilledFromSource event needed for Polymer proof generation
    */
   private async getFulfillTxForPolymerprover(
     inboxAddress: Hex,
     claimant: Hex,
     model: IntentSourceModel,
   ): Promise<ExecuteSmartWalletArg> {
-    // For Polymer, we use zero address as the local prover
-    // This prevents initiateProving() from being called, since Polymer
-    // proof generation happens off-chain via the eco-solver backend
-    const zeroAddress = '0x0000000000000000000000000000000000000000' as Hex
+    // Get the destination chain ID and the Polymer prover address for that chain
+    const destinationChainId = Number(model.intent.route.destination)
+    const polymerProverAddress = this.ecoConfigService.getPolymerProverAddress(destinationChainId)
+    
+    if (!polymerProverAddress) {
+      throw new Error(`No Polymer prover address configured for destination chain ${destinationChainId}`)
+    }
+
+    // For Polymer, sourceChainDomainID is the same as the source chain ID
+    const sourceChainId = Number(model.intent.route.source)
 
     const fulfillIntentData = encodeFunctionData({
       abi: InboxAbi,
-      functionName: 'fulfill',
+      functionName: 'fulfillAndProve',
       args: [
+        IntentDataModel.getHash(model.intent).intentHash,
         model.intent.route,
         RewardDataModel.getHash(model.intent.reward),
         claimant,
-        IntentDataModel.getHash(model.intent).intentHash,
-        zeroAddress, // Use zero address to skip initiateProving()
+        polymerProverAddress, // Use actual Polymer prover address
+        BigInt(sourceChainId), // Polymer uses chain IDs as domain IDs
+        '0x' as Hex, // Empty data for Polymer
       ],
     })
 

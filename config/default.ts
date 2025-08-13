@@ -317,11 +317,10 @@ export default {
     enabled: process.env.POLYMER_ENABLED === 'true',
     apiUrl: process.env.POLYMER_API_URL || 'https://proof.testnet.polymer.zone',
     apiToken: process.env.POLYMER_API_TOKEN || '',
-    proverAddresses: {
-      11155111: process.env.POLYMER_PROVER_SEPOLIA || '0x', // Sepolia
-      84532: process.env.POLYMER_PROVER_BASE_SEPOLIA || '0x', // Base Sepolia
-      421614: process.env.POLYMER_PROVER_ARBITRUM_SEPOLIA || '0x', // Arbitrum Sepolia
+    defaultProverAddress: process.env.POLYMER_DEFAULT_PROVER_ADDRESS || '0x0000000000000000000000000000000000000000',
+    chainOverrides: {
+      // Add chain-specific overrides here if needed
+      // Example: 42161: '0xDifferentArbitrumAddress'
     },
-    supportedChains: [11155111, 84532, 421614],
   },
 }
