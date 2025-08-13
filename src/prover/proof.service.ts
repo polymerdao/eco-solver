@@ -250,11 +250,11 @@ export class ProofService implements OnModuleInit {
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'polymer_requestProof',
-        params: {
+        params: [{
           srcChainId,
           srcBlockNumber: blockNumber,
           globalLogIndex: logIndex
-        },
+        }],
         id: 1
       })
     })
@@ -265,7 +265,19 @@ export class ProofService implements OnModuleInit {
 
     const data = await response.json()
     if (data.error) {
-      throw new Error(`Polymer API error: ${data.error.message}`)
+      // Handle specific error codes from docs
+      const errorCode = data.error.code
+      const errorMessage = data.error.message
+      
+      if (errorCode === -32000) {
+        throw new Error(`Unsupported chain ID: ${errorMessage}`)
+      }
+      
+      throw new Error(`Polymer API error (${errorCode}): ${errorMessage}`)
+    }
+
+    if (!data.result?.jobId) {
+      throw new Error('Invalid response: missing jobId')
     }
 
     return data.result.jobId
@@ -297,20 +309,26 @@ export class ProofService implements OnModuleInit {
 
     const data = await response.json()
     if (data.error) {
-      throw new Error(`Polymer query error: ${data.error.message}`)
+      const errorCode = data.error.code
+      const errorMessage = data.error.message
+      throw new Error(`Polymer query error (${errorCode}): ${errorMessage}`)
+    }
+
+    if (!data.result) {
+      throw new Error('Invalid query response: missing result')
     }
 
     return data.result
   }
 
   /**
-   * Wait for Polymer proof completion
+   * Wait for Polymer proof completion (follows 20-second polling recommendation)
    */
-  async waitForPolymerProof(jobId: string, maxAttempts = 30): Promise<string> {
+  async waitForPolymerProof(jobId: string, maxAttempts = 10): Promise<string> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const result = await this.queryPolymerProof(jobId)
       
-      if (result.status === 'complete') {
+      if (result.status === 'completed') {
         if (!result.proof) {
           throw new Error('Proof completed but no proof data returned')
         }
@@ -321,10 +339,10 @@ export class ProofService implements OnModuleInit {
         throw new Error('Proof generation failed')
       }
       
-      // Wait 2 seconds before retry
+      // Wait 2 seconds before retry (10 attempts = 20 seconds total)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
     
-    throw new Error(`Proof generation timeout after ${maxAttempts} attempts`)
+    throw new Error(`Proof generation timeout after ${maxAttempts * 2} seconds`)
   }
 }

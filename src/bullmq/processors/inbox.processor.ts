@@ -39,11 +39,11 @@ export class InboxProcessor extends WorkerHost {
       case QUEUES.INBOX.jobs.fulfillment:
         const fulfillment = job.data as FulfillmentLog
         
-        // Update local database as before
-        await this.utilsIntentService.updateOnFulfillment(fulfillment)
-        
-        // Handle Polymer proof submission if needed
-        await this.handlePolymerProofSubmission(fulfillment)
+        // Run fulfillment update and proof submission concurrently
+        await Promise.all([
+          this.updateFulfillmentStatus(fulfillment),
+          this.handlePolymerProofSubmission(fulfillment)
+        ])
         
         return
       default:
@@ -67,6 +67,19 @@ export class InboxProcessor extends WorkerHost {
         },
       }),
     )
+  }
+
+  /**
+   * Update fulfillment status in database
+   */
+  private async updateFulfillmentStatus(fulfillment: FulfillmentLog) {
+    try {
+      await this.utilsIntentService.updateOnFulfillment(fulfillment)
+      this.logger.debug(`Fulfillment status updated for intent ${fulfillment.args._hash}`)
+    } catch (error) {
+      this.logger.error(`Failed to update fulfillment status: ${error}`)
+      throw error // Rethrow since this is critical
+    }
   }
 
   /**
