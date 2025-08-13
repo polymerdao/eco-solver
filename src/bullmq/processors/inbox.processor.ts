@@ -8,6 +8,7 @@ import { FulfillmentLog } from '@/contracts/inbox'
 import { ProofService } from '@/prover/proof.service'
 import { MultichainPublicClientService } from '@/transaction/multichain-public-client.service'
 import { getPolymerProverAddress } from '@/eco-configs/utils'
+import { PolymerProverAbi } from '@/contracts'
 import { Hex } from 'viem'
 
 @Injectable()
@@ -161,21 +162,6 @@ export class InboxProcessor extends WorkerHost {
 
     // Get wallet client for source chain
     const client = await this.multichainPublicClientService.getClient(sourceChainId)
-
-    // Define minimal PolymerProver ABI for submitProof function
-    const PolymerProverAbi = [
-      {
-        inputs: [
-          { name: 'proof', type: 'bytes' },
-          { name: 'expectedIntentHash', type: 'bytes32' },
-          { name: 'expectedSourceChainId', type: 'uint256' }
-        ],
-        name: 'submitProof',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function'
-      }
-    ] as const
 
     // Submit proof to PolymerProver contract
     const txHash = await client.writeContract({
