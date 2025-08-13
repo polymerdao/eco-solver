@@ -190,15 +190,17 @@ export class InboxProcessor extends WorkerHost {
   ) {
     try {
       // 1. Request proof from Polymer API for the IntentFulfilledFromSource event
-      // The event was emitted on the destination chain, so we use destinationChainId
-      const jobId = await this.proofService.requestPolymerProof(
-        polymerEvent.destinationChainId, // The destination chain where the event was emitted
-        Number(polymerEvent.blockNumber),
-        polymerEvent.logIndex
+      // The event was emitted on the destination chain, so we use destinationChainId as source
+      // and sourceChainId as the destination for the proof
+      const jobID = await this.proofService.requestPolymerProof(
+        polymerEvent.destinationChainId, // Chain where the event was emitted (srcChainId)
+        Number(polymerEvent.blockNumber), // Block number containing the event
+        polymerEvent.logIndex,           // Receipt index (transaction index in block)
+        sourceChainId                    // Destination chain for the proof (dstChainId)
       )
 
       // 2. Wait for proof completion
-      const proofBase64 = await this.proofService.waitForPolymerProof(jobId)
+      const proofBase64 = await this.proofService.waitForPolymerProof(jobID)
 
       // 3. Submit proof to PolyNativeProver contract on source chain
       await this.submitPolymerProofOnChain(

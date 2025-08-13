@@ -232,14 +232,22 @@ export class ProofService implements OnModuleInit {
   }
 
   /**
-   * Request proof from Polymer API
+   * Request proof from Polymer API V1
    */
   async requestPolymerProof(
     srcChainId: number,
     blockNumber: number,
-    logIndex: number
+    receiptIndex: number,
+    dstChainId?: number
   ): Promise<string> {
     const config = this.getPolymerConfig()
+    
+    const params = {
+      srcChainId,
+      srcBlockNumber: blockNumber,
+      receiptIndex,
+      ...(dstChainId && { dstChainId })
+    }
     
     const response = await fetch(config.apiUrl, {
       method: 'POST',
@@ -249,12 +257,8 @@ export class ProofService implements OnModuleInit {
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        method: 'polymer_requestProof',
-        params: [{
-          srcChainId,
-          srcBlockNumber: blockNumber,
-          globalLogIndex: logIndex
-        }],
+        method: 'proof_request',
+        params,
         id: 1
       })
     })
@@ -265,28 +269,22 @@ export class ProofService implements OnModuleInit {
 
     const data = await response.json()
     if (data.error) {
-      // Handle specific error codes from docs
       const errorCode = data.error.code
       const errorMessage = data.error.message
-      
-      if (errorCode === -32000) {
-        throw new Error(`Unsupported chain ID: ${errorMessage}`)
-      }
-      
       throw new Error(`Polymer API error (${errorCode}): ${errorMessage}`)
     }
 
-    if (!data.result?.jobId) {
-      throw new Error('Invalid response: missing jobId')
+    if (!data.result?.jobID) {
+      throw new Error('Invalid response: missing jobID')
     }
 
-    return data.result.jobId
+    return data.result.jobID
   }
 
   /**
-   * Query proof status from Polymer API
+   * Query proof status from Polymer API V1
    */
-  async queryPolymerProof(jobId: string): Promise<{status: string, proof?: string}> {
+  async queryPolymerProof(jobID: string): Promise<{status: string, proof?: string, failureReason?: string}> {
     const config = this.getPolymerConfig()
     
     const response = await fetch(config.apiUrl, {
@@ -297,8 +295,8 @@ export class ProofService implements OnModuleInit {
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        method: 'polymer_queryProof',
-        params: { jobId },
+        method: 'proof_queryJob',
+        params: { jobID },
         id: 1
       })
     })
@@ -318,17 +316,21 @@ export class ProofService implements OnModuleInit {
       throw new Error('Invalid query response: missing result')
     }
 
-    return data.result
+    return {
+      status: data.result.status,
+      proof: data.result.proof,
+      failureReason: data.result.failureReason
+    }
   }
 
   /**
-   * Wait for Polymer proof completion (follows 20-second polling recommendation)
+   * Wait for Polymer proof completion (follows API polling best practices)
    */
-  async waitForPolymerProof(jobId: string, maxAttempts = 10): Promise<string> {
+  async waitForPolymerProof(jobID: string, maxAttempts = 30): Promise<string> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const result = await this.queryPolymerProof(jobId)
+      const result = await this.queryPolymerProof(jobID)
       
-      if (result.status === 'completed') {
+      if (result.status === 'complete') {
         if (!result.proof) {
           throw new Error('Proof completed but no proof data returned')
         }
@@ -336,10 +338,16 @@ export class ProofService implements OnModuleInit {
       }
       
       if (result.status === 'error') {
-        throw new Error('Proof generation failed')
+        const errorMsg = result.failureReason || 'Unknown error'
+        throw new Error(`Proof generation failed: ${errorMsg}`)
       }
       
-      // Wait 2 seconds before retry (10 attempts = 20 seconds total)
+      if (result.status === 'not_found') {
+        throw new Error(`Proof job not found: ${jobID}`)
+      }
+      
+      // For 'initialized' and 'pending' status, continue polling
+      // Wait 2 seconds before retry (30 attempts = 60 seconds total)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
     
