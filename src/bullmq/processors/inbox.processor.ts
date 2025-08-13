@@ -144,6 +144,8 @@ export class InboxProcessor extends WorkerHost {
 
   /**
    * Submit proof to PolymerProver contract on source chain
+   * Note: This flow is different from messaging based fulfill flows where 
+   * a message is triggered via destination chain's local prover.
    */
   private async submitPolymerProofOnChain(
     proofBase64: string,

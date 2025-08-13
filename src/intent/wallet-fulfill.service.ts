@@ -30,7 +30,7 @@ import { IFulfillService } from '@/intent/interfaces/fulfill-service.interface'
 import { IntentDataModel } from '@/intent/schemas/intent-data.schema'
 import { RewardDataModel } from '@/intent/schemas/reward-data.schema'
 import { IntentSourceModel } from '@/intent/schemas/intent-source.schema'
-import { getChainConfig, getPolymerProverAddress } from '@/eco-configs/utils'
+import { getChainConfig } from '@/eco-configs/utils'
 import { EcoAnalyticsService } from '@/analytics'
 
 /**
@@ -498,15 +498,11 @@ export class WalletFulfillService implements IFulfillService {
     claimant: Hex,
     model: IntentSourceModel,
   ): Promise<ExecuteSmartWalletArg> {
-    // For Polymer, we need to get the PolymerProver address from chain config
-    const polymerProverAddr = getPolymerProverAddress(Number(model.intent.route.destination))
-    
-    if (!polymerProverAddr) {
-      throw new Error(`No PolymerProver configured for chain ${model.intent.route.destination}`)
-    }
+    // For Polymer, we use zero address as the local prover
+    // This prevents initiateProving() from being called, since Polymer
+    // proof generation happens off-chain via the eco-solver backend
+    const zeroAddress = '0x0000000000000000000000000000000000000000' as Hex
 
-    // Call fulfill() with the PolymerProver address
-    // The actual proof submission happens off-chain later
     const fulfillIntentData = encodeFunctionData({
       abi: InboxAbi,
       functionName: 'fulfill',
@@ -515,7 +511,7 @@ export class WalletFulfillService implements IFulfillService {
         RewardDataModel.getHash(model.intent.reward),
         claimant,
         IntentDataModel.getHash(model.intent).intentHash,
-        polymerProverAddr as Hex, // Use PolymerProver address
+        zeroAddress, // Use zero address to skip initiateProving()
       ],
     })
 
