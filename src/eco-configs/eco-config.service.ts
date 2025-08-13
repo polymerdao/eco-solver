@@ -380,4 +380,8 @@ export class EcoConfigService {
       ),
     }
   }
+
+  getPolymerConfig(): EcoConfigType['polymer'] {
+    return this.get('polymer')
+  }
 }

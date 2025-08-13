@@ -30,7 +30,7 @@ import { IFulfillService } from '@/intent/interfaces/fulfill-service.interface'
 import { IntentDataModel } from '@/intent/schemas/intent-data.schema'
 import { RewardDataModel } from '@/intent/schemas/reward-data.schema'
 import { IntentSourceModel } from '@/intent/schemas/intent-source.schema'
-import { getChainConfig } from '@/eco-configs/utils'
+import { getChainConfig, getPolymerProverAddress } from '@/eco-configs/utils'
 import { EcoAnalyticsService } from '@/analytics'
 
 /**
@@ -259,6 +259,22 @@ export class WalletFulfillService implements IFulfillService {
   ): Promise<ExecuteSmartWalletArg> {
     const claimant = this.ecoConfigService.getEth().claimant
 
+    // Polymer Prover - NEW
+    const isPolymer = this.proofService.isPolymerProver(
+      Number(model.intent.route.source),
+      model.intent.reward.prover,
+    )
+    if (isPolymer) {
+      const result = await this.getFulfillTxForPolymerprover(inboxAddress, claimant, model)
+      this.ecoAnalytics.trackFulfillIntentTxCreationSuccess(
+        model,
+        inboxAddress,
+        'polymer',
+        result,
+      )
+      return result
+    }
+
     // Hyper Prover
     const isHyperlane = this.proofService.isHyperlaneProver(
       Number(model.intent.route.source),
@@ -470,5 +486,43 @@ export class WalletFulfillService implements IFulfillService {
       data: callData,
     })
     return BigInt(proverData.data ?? 0)
+  }
+
+  /**
+   * Generates a transaction to fulfill an intent for a Polymer prover
+   * For Polymer, we just call fulfill() without immediate proving
+   * The proof will be submitted separately via the Polymer API
+   */
+  private async getFulfillTxForPolymerprover(
+    inboxAddress: Hex,
+    claimant: Hex,
+    model: IntentSourceModel,
+  ): Promise<ExecuteSmartWalletArg> {
+    // For Polymer, we need to get the PolymerProver address from chain config
+    const polymerProverAddr = getPolymerProverAddress(Number(model.intent.route.destination))
+    
+    if (!polymerProverAddr) {
+      throw new Error(`No PolymerProver configured for chain ${model.intent.route.destination}`)
+    }
+
+    // Call fulfill() with the PolymerProver address
+    // The actual proof submission happens off-chain later
+    const fulfillIntentData = encodeFunctionData({
+      abi: InboxAbi,
+      functionName: 'fulfill',
+      args: [
+        model.intent.route,
+        RewardDataModel.getHash(model.intent.reward),
+        claimant,
+        IntentDataModel.getHash(model.intent).intentHash,
+        polymerProverAddr as Hex, // Use PolymerProver address
+      ],
+    })
+
+    return {
+      to: inboxAddress,
+      data: fulfillIntentData,
+      value: 0n, // No immediate fee for Polymer
+    }
   }
 }

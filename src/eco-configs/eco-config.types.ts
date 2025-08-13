@@ -84,6 +84,7 @@ export type EcoConfigType = {
   squid: SquidConfig
   CCTPV2: CCTPV2Config
   everclear: EverclearConfig
+  polymer: PolymerConfig
 }
 
 export type EcoConfigKeys = keyof EcoConfigType
@@ -156,6 +157,7 @@ export type IntentConfig = {
   proofs: {
     hyperlane_duration_seconds: number
     metalayer_duration_seconds: number
+    polymer_duration_seconds: number
   }
   isNativeETHSupported: boolean
   intentFundedRetries: number
@@ -523,4 +525,12 @@ export interface SquidConfig {
 
 export interface EverclearConfig {
   baseUrl: string
+}
+
+export interface PolymerConfig {
+  enabled: boolean
+  apiUrl: string
+  apiToken: string
+  proverAddresses: Record<number, Hex>
+  supportedChains: number[]
 }

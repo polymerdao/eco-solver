@@ -58,6 +58,16 @@ export class ProofService implements OnModuleInit {
   }
 
   /**
+   * Checks if the prover is a polymer prover
+   * @param chainID
+   * @param proverAddress the prover address
+   * @returns
+   */
+  isPolymerProver(chainID: number, proverAddress: Hex): boolean {
+    return Boolean(this.getProverType(chainID, proverAddress)?.isPolymer())
+  }
+
+  /**
    * Returns all the prover addresses for a given proof type
    * @param proofType the proof type
    * @returns
@@ -207,8 +217,114 @@ export class ProofService implements OnModuleInit {
         return proofs.hyperlane_duration_seconds
       case prover.isMetalayer():
         return proofs.metalayer_duration_seconds
+      case prover.isPolymer():
+        return proofs.polymer_duration_seconds
       default:
         throw EcoError.ProverNotSupported(prover)
     }
+  }
+
+  /**
+   * Get Polymer API configuration for proof generation
+   */
+  getPolymerConfig() {
+    return this.ecoConfigService.getPolymerConfig()
+  }
+
+  /**
+   * Request proof from Polymer API
+   */
+  async requestPolymerProof(
+    srcChainId: number,
+    blockNumber: number,
+    logIndex: number
+  ): Promise<string> {
+    const config = this.getPolymerConfig()
+    
+    const response = await fetch(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'polymer_requestProof',
+        params: {
+          srcChainId,
+          srcBlockNumber: blockNumber,
+          globalLogIndex: logIndex
+        },
+        id: 1
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Polymer API request failed: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (data.error) {
+      throw new Error(`Polymer API error: ${data.error.message}`)
+    }
+
+    return data.result.jobId
+  }
+
+  /**
+   * Query proof status from Polymer API
+   */
+  async queryPolymerProof(jobId: string): Promise<{status: string, proof?: string}> {
+    const config = this.getPolymerConfig()
+    
+    const response = await fetch(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'polymer_queryProof',
+        params: { jobId },
+        id: 1
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Polymer query failed: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (data.error) {
+      throw new Error(`Polymer query error: ${data.error.message}`)
+    }
+
+    return data.result
+  }
+
+  /**
+   * Wait for Polymer proof completion
+   */
+  async waitForPolymerProof(jobId: string, maxAttempts = 30): Promise<string> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const result = await this.queryPolymerProof(jobId)
+      
+      if (result.status === 'complete') {
+        if (!result.proof) {
+          throw new Error('Proof completed but no proof data returned')
+        }
+        return result.proof
+      }
+      
+      if (result.status === 'error') {
+        throw new Error('Proof generation failed')
+      }
+      
+      // Wait 2 seconds before retry
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+    
+    throw new Error(`Proof generation timeout after ${maxAttempts} attempts`)
   }
 }

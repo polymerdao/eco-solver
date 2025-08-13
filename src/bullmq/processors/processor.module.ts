@@ -6,9 +6,11 @@ import { BalanceModule } from '../../balance/balance.module'
 import { IntentModule } from '../../intent/intent.module'
 import { SignModule } from '../../sign/sign.module'
 import { InboxProcessor } from '@/bullmq/processors/inbox.processor'
+import { ProverModule } from '@/prover/prover.module'
+import { TransactionModule } from '@/transaction/transaction.module'
 
 @Module({
-  imports: [BalanceModule, IntentModule, SignModule],
+  imports: [BalanceModule, IntentModule, SignModule, ProverModule, TransactionModule],
   providers: [EthWebsocketProcessor, SignerProcessor, SolveIntentProcessor, InboxProcessor],
 })
 export class ProcessorModule {}

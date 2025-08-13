@@ -3,6 +3,7 @@ import { Enumify } from 'enumify'
 export class ProofType extends Enumify {
   static HYPERLANE = new ProofType('Hyperlane')
   static METALAYER = new ProofType('Metalayer')
+  static POLYMER = new ProofType('Polymer')
   static _ = ProofType.closeEnum()
 
   constructor(private providerValue: string) {
@@ -38,6 +39,10 @@ export class ProofType extends Enumify {
 
   isMetalayer(): boolean {
     return this === ProofType.METALAYER
+  }
+
+  isPolymer(): boolean {
+    return this === ProofType.POLYMER
   }
 
   static fromProviderValue(providerValue: string): ProofType {

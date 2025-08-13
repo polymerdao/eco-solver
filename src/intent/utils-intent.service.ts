@@ -190,4 +190,20 @@ export class UtilsIntentService {
     this.ecoAnalytics.trackSolverResolutionSuccess(destination, solver, opts)
     return solver
   }
+
+  /**
+   * Get intent model by intent hash
+   * @param intentHash the intent hash
+   * @returns Intent model or null if not found
+   */
+  async getIntentModel(intentHash: string): Promise<any | null> {
+    try {
+      return await this.intentModel.findOne({
+        'intent.hash': intentHash,
+      })
+    } catch (error) {
+      this.logger.error(`Failed to get intent model for hash ${intentHash}: ${error}`)
+      return null
+    }
+  }
 }

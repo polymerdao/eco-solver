@@ -51,3 +51,27 @@ export function getChainConfig(chainID: number | string): EcoChainConfig {
   }
   return config
 }
+
+/**
+ * Get PolymerProver address for a given chain
+ * TODO: This should come from @eco-foundation/routes-ts eventually
+ */
+export function getPolymerProverAddress(chainID: number): string | undefined {
+  const env = isPreEnv() ? 'pre' : 'prod'
+  
+  // Temporary mapping until @eco-foundation/routes-ts is updated
+  const polymerProvers: Record<string, Record<number, string>> = {
+    pre: {
+      11155111: '0x...', // Sepolia PolymerProver
+      84532: '0x...',    // Base Sepolia PolymerProver
+      421614: '0x...',   // Arbitrum Sepolia PolymerProver
+    },
+    prod: {
+      1: '0x...',        // Ethereum PolymerProver
+      8453: '0x...',     // Base PolymerProver
+      42161: '0x...',    // Arbitrum PolymerProver
+    }
+  }
+  
+  return polymerProvers[env]?.[chainID]
+}
