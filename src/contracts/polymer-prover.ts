@@ -1,11 +1,12 @@
 /**
- * PolymerProver ABI (PolyNativeProver contract)
+ * PolymerProver ABI (matches the updated PolymerProver.sol contract)
  * 
- * The new interface simplifies proof submission:
- * - validate(): Validates a single proof and extracts intent data from the validated event
+ * Core functions:
+ * - validate(): Validates a single proof and processes the intent
  * - validateBatch(): Validates multiple proofs in one transaction
  * - getProofType(): Returns "Polymer" to identify the prover type
- * - prove(): Emits IntentFulfilledFromSource events that can be proven by Polymer
+ * - prove(): Emits IntentFulfilledFromSource events for Polymer proof generation
+ * - initialize(): Owner-only initialization function (called after deployment)
  */
 export const PolymerProverAbi = [
   {
@@ -48,6 +49,17 @@ export const PolymerProverAbi = [
     type: 'function'
   },
   {
+    inputs: [
+      { internalType: 'address', name: '_crossL2ProverV2', type: 'address' },
+      { internalType: 'uint64[]', name: '_chainIds', type: 'uint64[]' },
+      { internalType: 'bytes32[]', name: '_whitelistedEmitters', type: 'bytes32[]' }
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'bytes32', name: 'intentHash', type: 'bytes32' },
@@ -55,6 +67,24 @@ export const PolymerProverAbi = [
       { indexed: false, internalType: 'uint64', name: 'destination', type: 'uint64' }
     ],
     name: 'IntentFulfilledFromSource',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'bytes32', name: 'intentHash', type: 'bytes32' },
+      { indexed: true, internalType: 'address', name: 'claimant', type: 'address' },
+      { indexed: false, internalType: 'uint64', name: 'destination', type: 'uint64' }
+    ],
+    name: 'IntentProven',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'bytes32', name: 'intentHash', type: 'bytes32' }
+    ],
+    name: 'IntentAlreadyProven',
     type: 'event'
   }
 ] as const
