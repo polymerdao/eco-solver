@@ -1,4 +1,6 @@
 const mockEncodeFunctionData = jest.fn()
+        oytes32[] me
+        uint256 minGasLimit
 const mockGetTransactionTargetData = jest.fn()
 const mockEncodeAbiParameters = jest.fn()
 const mockGetChainConfig = jest.fn()
@@ -89,7 +91,7 @@ describe('WalletFulfillService', () => {
   const model = {
     intent: {
       route: { hash, destination: 1n, calls: [], getHash: () => '0x6543' },
-      reward: { getHash: () => '0x123abc' },
+      reward: { getHash: () => '0x123abc', prover: address1 },
       getHash: () => {
         return { intentHash: '0xaaaa999' }
       },
@@ -158,6 +160,7 @@ describe('WalletFulfillService', () => {
         fulfillIntentService['getFulfillTxForHyperproverSingle'] = jest
           .fn()
           .mockReturnValue(emptyTxs[0])
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(ecoConfigService, 'getEth').mockReturnValue({ claimant } as any)
         jest.spyOn(accountClientService, 'getClient').mockImplementation(async () => {
           return {
@@ -207,6 +210,7 @@ describe('WalletFulfillService', () => {
         fulfillIntentService['getFulfillTxForHyperproverSingle'] = jest
           .fn()
           .mockReturnValue(emptyTxs[0])
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(ecoConfigService, 'getEth').mockReturnValue({ claimant } as any)
         jest.spyOn(accountClientService, 'getClient').mockImplementation(async () => {
           return {
@@ -234,6 +238,7 @@ describe('WalletFulfillService', () => {
         fulfillIntentService['getFulfillTxForHyperproverSingle'] = jest
           .fn()
           .mockReturnValue(emptyTxs[0])
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(ecoConfigService, 'getEth').mockReturnValue({ claimant } as any)
         jest.spyOn(accountClientService, 'getClient').mockImplementation(async () => {
           return {
@@ -501,6 +506,7 @@ describe('WalletFulfillService', () => {
 
     describe('on PROOF_METALAYER', () => {
       it('should use the correct function name and args', async () => {
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(true)
         jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(false)
         fulfillIntentService['getFulfillTxForMetalayer'] = jest.fn().mockReturnValue(emptyTxs[0])
@@ -520,6 +526,7 @@ describe('WalletFulfillService', () => {
 
       it('should use the correct function name and args for getFulfillTxForMetalayer', async () => {
         const data = '0x9911'
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(true)
         jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(false)
         mockEncodeFunctionData.mockReturnValue(data)
@@ -551,8 +558,51 @@ describe('WalletFulfillService', () => {
       })
     })
 
+    describe('on PROOF_POLYMER', () => {
+      it('should use the correct function name and args', async () => {
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(true)
+        jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(false)
+        jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(false)
+        fulfillIntentService['getFulfillTxForPolymerprover'] = jest.fn().mockReturnValue(emptyTxs[0])
+        await fulfillIntentService['getFulfillIntentTx'](solver.inboxAddress, model as any)
+        expect(proofService.isPolymerProver).toHaveBeenCalledTimes(1)
+        expect(proofService.isPolymerProver).toHaveBeenCalledWith(
+          Number(model.intent.route.source),
+          model.intent.reward.prover,
+        )
+        expect(fulfillIntentService['getFulfillTxForPolymerprover']).toHaveBeenCalledTimes(1)
+      })
+
+      it('should use the correct function name and args for getFulfillTxForPolymerprover', async () => {
+        const data = '0x9911'
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(true)
+        jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(false)
+        jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(false)
+        mockEncodeFunctionData.mockReturnValue(data)
+        
+        const polymerProverAddress = '0x0000000000000000000000000000000000000000'
+        jest.spyOn(ecoConfigService, 'getPolymerProverAddress').mockReturnValue(polymerProverAddress)
+        
+        const polymerTx = { to: solver.inboxAddress, data, value: 0n }
+        fulfillIntentService['getFulfillTxForPolymerprover'] = jest.fn().mockReturnValue(polymerTx)
+
+        const tx = await fulfillIntentService['getFulfillIntentTx'](
+          solver.inboxAddress,
+          model as any,
+        )
+        expect(tx).toEqual(polymerTx)
+        expect(fulfillIntentService['getFulfillTxForPolymerprover']).toHaveBeenCalledTimes(1)
+        expect(fulfillIntentService['getFulfillTxForPolymerprover']).toHaveBeenCalledWith(
+          solver.inboxAddress,
+          claimant,
+          model,
+        )
+      })
+    })
+
     describe('on PROOF_HYPERLANE', () => {
       it('should use the correct function name and args', async () => {
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         const mockHyperlane = jest.fn().mockReturnValue(true)
         proofService.isHyperlaneProver = mockHyperlane
         fulfillIntentService['getFulfillTxForHyperproverSingle'] = jest
@@ -569,6 +619,7 @@ describe('WalletFulfillService', () => {
 
       it('should use the correct function name and args for fulfillHyperInstantWithRelayer', async () => {
         const data = '0x9911'
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(true)
         jest.spyOn(ecoConfigService, 'getFulfill').mockReturnValue({ run: 'single' })
@@ -599,6 +650,7 @@ describe('WalletFulfillService', () => {
 
       it('should use the correct function name and args for fulfillHyperBatched', async () => {
         const data = '0x9911'
+        jest.spyOn(proofService, 'isPolymerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isMetalayerProver').mockReturnValue(false)
         jest.spyOn(proofService, 'isHyperlaneProver').mockReturnValue(true)
         mockEncodeFunctionData.mockReturnValue(data)
@@ -704,6 +756,50 @@ describe('WalletFulfillService', () => {
         [pad(model.intent.reward.prover)],
       )
       expect(mockProverFee).toHaveBeenCalledWith(model, address2, address1, encodedData)
+    })
+  })
+
+  describe('on getFulfillTxForPolymerprover', () => {
+    beforeEach(() => {
+      mockEncodeFunctionData.mockClear()
+    })
+    it('should encode the contract data correctly', async () => {
+      const model = {
+        event: {
+          sourceChainID: 10n,
+        },
+        intent: {
+          hash: '0x1234',
+          reward: {
+            prover: address3,
+          },
+          route: {
+            source: 10n,
+            destination: 1n,
+          },
+        },
+      } as any
+      const polymerProverAddress = '0x0000000000000000000000000000000000000000'
+      jest.spyOn(ecoConfigService, 'getPolymerProverAddress').mockReturnValue(polymerProverAddress)
+      
+      const encodedData = '0x9911'
+      mockEncodeFunctionData.mockReturnValue(encodedData)
+      
+      // Mock the static methods
+      RewardDataModel.getHash = jest.fn().mockReturnValue('0x123abc')
+      IntentDataModel.getHash = jest.fn().mockReturnValue({ intentHash: '0xabc123' })
+      
+      const result = await fulfillIntentService['getFulfillTxForPolymerprover'](address1, address2, model)
+      
+      expect(result).toEqual({
+        to: address1,
+        data: encodedData,
+        value: 0n,
+      })
+      
+      expect(mockEncodeFunctionData).toHaveBeenCalledTimes(1)
+      
+      expect(ecoConfigService.getPolymerProverAddress).toHaveBeenCalledWith(1) // destination chain ID
     })
   })
 })

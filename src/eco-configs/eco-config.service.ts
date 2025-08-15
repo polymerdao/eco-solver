@@ -399,8 +399,4 @@ export class EcoConfigService {
     return polymerConfig.defaultProverAddress
   }
 
-  isPolymerProverAddress(address: Hex, chainID: number): boolean {
-    const proverAddress = this.getPolymerProverAddress(chainID)
-    return proverAddress?.toLowerCase() === address.toLowerCase()
-  }
 }

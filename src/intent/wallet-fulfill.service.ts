@@ -259,9 +259,11 @@ export class WalletFulfillService implements IFulfillService {
   ): Promise<ExecuteSmartWalletArg> {
     const claimant = this.ecoConfigService.getEth().claimant
 
-    // Polymer Prover - NEW
-    const sourceChainId = Number(model.intent.route.source)
-    const isPolymer = this.ecoConfigService.isPolymerProverAddress(model.intent.reward.prover, sourceChainId)
+    // Polymer Prover
+    const isPolymer = this.proofService.isPolymerProver(
+      Number(model.intent.route.source),
+      model.intent.reward.prover,
+    )
     if (isPolymer) {
       const result = await this.getFulfillTxForPolymerprover(inboxAddress, claimant, model)
       this.ecoAnalytics.trackFulfillIntentTxCreationSuccess(
@@ -511,13 +513,12 @@ export class WalletFulfillService implements IFulfillService {
       abi: InboxAbi,
       functionName: 'fulfillAndProve',
       args: [
-        IntentDataModel.getHash(model.intent).intentHash,
-        model.intent.route,
-        RewardDataModel.getHash(model.intent.reward),
-        claimant,
-        polymerProverAddress, // Use actual Polymer prover address
-        BigInt(sourceChainId), // Polymer uses chain IDs as domain IDs
-        '0x' as Hex, // Empty data for Polymer
+        model.intent.route, // Route struct
+        RewardDataModel.getHash(model.intent.reward), // bytes32 reward hash
+        claimant, // address claimant
+        IntentDataModel.getHash(model.intent).intentHash, // bytes32 expected hash
+        polymerProverAddress, // address local prover
+        '0x' as Hex, // bytes data for Polymer
       ],
     })
 

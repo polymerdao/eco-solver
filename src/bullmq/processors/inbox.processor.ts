@@ -99,40 +99,39 @@ export class InboxProcessor extends WorkerHost {
       if (!model) return
 
       const sourceChainId = Number(model.intent.route.source)
-      const destinationChainId = Number(model.intent.route.destination)
       const proverAddress = model.intent.reward.prover
 
       // Check if this intent uses Polymer proving by checking if prover address matches for source chain
-      const isPolymerProver = this.ecoConfigService.isPolymerProverAddress(proverAddress, sourceChainId)
+      const isPolymerProver = this.proofService.isPolymerProver(sourceChainId, proverAddress)
+      if (!isPolymerProver) return
+    
+      this.logger.debug(`Starting Polymer proof generation for intent ${fulfillment.args._hash}`)
       
-      if (isPolymerProver) {
-        this.logger.debug(`Starting Polymer proof generation for intent ${fulfillment.args._hash}`)
-        
-        // Get the prover address for the destination chain (may be different due to overrides)
-        const destProverAddress = this.ecoConfigService.getPolymerProverAddress(destinationChainId)
-        // Find the IntentFulfilledFromSource event on the destination chain
-        const polymerEvent = await this.findPolymerProverEvent(
-          destinationChainId,
-          fulfillment.transactionHash as Hex,
-          fulfillment.args._hash,
-          destProverAddress
-        )
-        
-        if (!polymerEvent) {
-          this.logger.error(`Could not find IntentFulfilledFromSource event for intent ${fulfillment.args._hash}`)
-          return
-        }
-        
-        // Generate and submit proof for the correct event
-        // Get the source chain prover address for submission
-        const sourceProverAddress = this.ecoConfigService.getPolymerProverAddress(sourceChainId)
-        if (!sourceProverAddress) {
-          this.logger.error(`No Polymer prover address configured for source chain ${sourceChainId}`)
-          return
-        }
-        
-        await this.generateAndSubmitPolymerProof(polymerEvent, sourceChainId, sourceProverAddress)
+      // Get the prover address for the destination chain (may be different due to overrides)
+      const destinationChainId = Number(model.intent.route.destination)
+      const destProverAddress = this.ecoConfigService.getPolymerProverAddress(destinationChainId)
+      // Find the IntentFulfilledFromSource event on the destination chain
+      const polymerEvent = await this.findPolymerProverEvent(
+        destinationChainId,
+        fulfillment.transactionHash as Hex,
+        fulfillment.args._hash,
+        destProverAddress
+      )
+      
+      if (!polymerEvent) {
+        this.logger.error(`Could not find IntentFulfilledFromSource event for intent ${fulfillment.args._hash}`)
+        return
       }
+      
+      // Generate and submit proof for the correct event
+      // Get the source chain prover address for submission
+      const sourceProverAddress = this.ecoConfigService.getPolymerProverAddress(sourceChainId)
+      if (!sourceProverAddress) {
+        this.logger.error(`No Polymer prover address configured for source chain ${sourceChainId}`)
+        return
+      }
+      
+      await this.generateAndSubmitPolymerProof(polymerEvent, sourceChainId, sourceProverAddress)
     } catch (error) {
       this.logger.error(`Polymer proof handling failed: ${error}`)
       // Don't throw - this is best effort
