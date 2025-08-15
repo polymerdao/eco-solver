@@ -7,6 +7,7 @@ import { UtilsIntentService } from '@/intent/utils-intent.service'
 import { FulfillmentLog } from '@/contracts/inbox'
 import { ProofService } from '@/prover/proof.service'
 import { MultichainPublicClientService } from '@/transaction/multichain-public-client.service'
+import { WalletClientDefaultSignerService } from '@/transaction/smart-wallets/wallet-client.service'
 import { EcoConfigService } from '@/eco-configs/eco-config.service'
 import { PolymerProverAbi } from '@/contracts'
 import { Hex, parseEventLogs } from 'viem'
@@ -19,6 +20,7 @@ export class InboxProcessor extends WorkerHost {
     private readonly utilsIntentService: UtilsIntentService,
     private readonly proofService: ProofService,
     private readonly multichainPublicClientService: MultichainPublicClientService,
+    private readonly walletClientDefaultSignerService: WalletClientDefaultSignerService,
     private readonly ecoConfigService: EcoConfigService,
   ) {
     super()
@@ -110,6 +112,11 @@ export class InboxProcessor extends WorkerHost {
       // Get the prover address for the destination chain (may be different due to overrides)
       const destinationChainId = Number(model.intent.route.destination)
       const destProverAddress = this.ecoConfigService.getPolymerProverAddress(destinationChainId)
+      if (!destProverAddress) {
+        this.logger.error(`No Polymer prover address configured for destination chain ${destinationChainId}`)
+        return
+      }
+      
       // Find the IntentFulfilledFromSource event on the destination chain
       const polymerEvent = await this.findPolymerProverEvent(
         destinationChainId,
@@ -209,7 +216,7 @@ export class InboxProcessor extends WorkerHost {
         proverAddress
       )
 
-      this.logger.info(`Polymer proof submitted successfully for intent ${polymerEvent.intentHash}`)
+      this.logger.log(`Polymer proof submitted successfully for intent ${polymerEvent.intentHash}`)
     } catch (error) {
       this.logger.error(`Polymer proof generation failed: ${error}`)
       throw error
@@ -234,17 +241,17 @@ export class InboxProcessor extends WorkerHost {
     const proofHex = `0x${proofBytes.toString('hex')}` as Hex
 
     // Get wallet client for source chain
-    const client = await this.multichainPublicClientService.getClient(sourceChainId)
+    const walletClient = await this.walletClientDefaultSignerService.getClient(sourceChainId)
 
     // Submit proof to PolyNativeProver contract using the new validate function
     // The contract will extract the intent hash and claimant from the validated event
-    const txHash = await client.writeContract({
+    const txHash = await walletClient.writeContract({
       address: proverAddress,
       abi: PolymerProverAbi,
       functionName: 'validate',
       args: [proofHex]
     })
 
-    this.logger.info(`Polymer proof validated in tx: ${txHash} for intent: ${intentHash}`)
+    this.logger.log(`Polymer proof validated in tx: ${txHash} for intent: ${intentHash}`)
   }
 }
