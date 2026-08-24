@@ -51,7 +51,7 @@ interface LiFiCacheConfig {
   refreshInterval: number // How often to refresh
   maxRetries: number
   retryDelayMs: number
-  fallbackBehavior: 'allow-all' | 'deny-unknown'
+  fallbackBehavior: 'deny-unknown'
 }
 
 export class LiFiAssetCacheManager {
@@ -76,7 +76,7 @@ export class LiFiAssetCacheManager {
       refreshInterval: 3240000, // 90% of TTL
       maxRetries: 3,
       retryDelayMs: 1000,
-      fallbackBehavior: 'allow-all',
+      fallbackBehavior: 'deny-unknown',
       ...config,
     }
 
@@ -155,8 +155,8 @@ export class LiFiAssetCacheManager {
         }),
       )
 
-      // Use fallback behavior - allow all tokens but log warnings
-      this.isInitialized = true
+      // Keep the cache unavailable so all validation remains fail closed.
+      this.isInitialized = false
       throw error
     }
   }
@@ -273,25 +273,15 @@ export class LiFiAssetCacheManager {
    * @returns true if the token is supported, false otherwise
    */
   isTokenSupported(chainId: number, tokenAddress: string): boolean {
-    // If cache is not initialized or expired, use fallback behavior
+    // Never approve an asset without a fresh allowlist.
     if (!this.isInitialized || !this.isCacheValid()) {
-      if (this.config.fallbackBehavior === 'allow-all') {
-        this.logger.warn(
-          EcoLogMessage.fromDefault({
-            message: 'LiFi: Asset cache not ready, allowing token by default',
-            properties: { chainId, tokenAddress },
-          }),
-        )
-        return true
-      } else {
-        this.logger.warn(
-          EcoLogMessage.fromDefault({
-            message: 'LiFi: Asset cache not ready, denying token by default',
-            properties: { chainId, tokenAddress },
-          }),
-        )
-        return false
-      }
+      this.logger.warn(
+        EcoLogMessage.fromDefault({
+          message: 'LiFi: Asset cache not ready, denying token by default',
+          properties: { chainId, tokenAddress },
+        }),
+      )
+      return false
     }
 
     const chainTokens = this.cache.tokens.get(chainId)
@@ -310,19 +300,15 @@ export class LiFiAssetCacheManager {
    * @returns true if the chain is supported, false otherwise
    */
   isChainSupported(chainId: number): boolean {
-    // If cache is not initialized or expired, use fallback behavior
+    // Never approve a chain without a fresh allowlist.
     if (!this.isInitialized || !this.isCacheValid()) {
-      if (this.config.fallbackBehavior === 'allow-all') {
-        this.logger.warn(
-          EcoLogMessage.fromDefault({
-            message: 'LiFi: Asset cache not ready, allowing chain by default',
-            properties: { chainId },
-          }),
-        )
-        return true
-      } else {
-        return false
-      }
+      this.logger.warn(
+        EcoLogMessage.fromDefault({
+          message: 'LiFi: Asset cache not ready, denying chain by default',
+          properties: { chainId },
+        }),
+      )
+      return false
     }
 
     return this.cache.chains.has(chainId)
