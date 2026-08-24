@@ -188,6 +188,7 @@ describe('LiFiAssetCacheManager', () => {
           msg: 'LiFi: Failed to initialize asset cache',
         }),
       )
+      expect(cacheManager.getCacheStatus().isInitialized).toBe(false)
     })
 
     it('should retry on failure with exponential backoff', async () => {
@@ -268,26 +269,8 @@ describe('LiFiAssetCacheManager', () => {
       )
     })
 
-    it('should use fallback behavior when cache not ready', () => {
-      const uninitializedManager = new LiFiAssetCacheManager(ecoConfigService, logger, {
-        fallbackBehavior: 'allow-all',
-      })
-
-      expect(
-        uninitializedManager.isTokenSupported(1, '0x1234567890123456789012345678901234567890'),
-      ).toBe(true)
-
-      expect(logger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: 'LiFi: Asset cache not ready, allowing token by default',
-        }),
-      )
-    })
-
-    it('should deny tokens when fallback is deny-unknown', () => {
-      const uninitializedManager = new LiFiAssetCacheManager(ecoConfigService, logger, {
-        fallbackBehavior: 'deny-unknown',
-      })
+    it('should deny tokens by default when cache is not ready', () => {
+      const uninitializedManager = new LiFiAssetCacheManager(ecoConfigService, logger)
 
       expect(
         uninitializedManager.isTokenSupported(1, '0x1234567890123456789012345678901234567890'),
@@ -296,6 +279,18 @@ describe('LiFiAssetCacheManager', () => {
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: 'LiFi: Asset cache not ready, denying token by default',
+        }),
+      )
+    })
+
+    it('should deny chains when cache is not ready', () => {
+      const uninitializedManager = new LiFiAssetCacheManager(ecoConfigService, logger)
+
+      expect(uninitializedManager.isChainSupported(1)).toBe(false)
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: 'LiFi: Asset cache not ready, denying chain by default',
         }),
       )
     })
